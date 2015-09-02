@@ -349,6 +349,7 @@ public class Map {
 		}
 	}
 	
+	//This attempts to change the wall image based on what walls are around it
 	private void UpdateWallImages() {
 		for(int y=0; y<grid[0].length; y++) {
 			for(int x=0; x< grid.length; x++) {
