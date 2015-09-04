@@ -8,10 +8,9 @@ import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 
-import com.clementsclan.rogue.Tile.Type;
 
 public class Map {
-	private Tile[][] grid;
+	private Sprite[][] grid;
 	private List<Rectangle> roomList;
 	private final int windingPercent = 0;
 	Random random;
@@ -64,11 +63,11 @@ public class Map {
 
 	
 	private void initGrid(int w, int h) {
-		grid = new Tile[w][h];
+		grid = new Sprite[w][h];
 		regions2D = new int[w][h];
 		for(int y=0; y<grid[0].length; y++) {  //Fill in the entire grid with walls
 			for(int x=0; x<grid.length; x++){
-				grid[x][y] = new Tile(Tile.Type.WALL);
+				grid[x][y] = new Wall(x,y);
 				regions2D[x][y] = currentRegion;
 			}	
 		}
@@ -104,7 +103,7 @@ public class Map {
 					roomList.add(newRoom);
 					for(x=0; x<newRoom.width; x++) {
 						for(y=0; y<newRoom.height; y++) {
-						    setTile(newRoom.x + x, newRoom.y + y, Tile.Type.ROOM);
+						    setTile(new Room(newRoom.x + x, newRoom.y + y));
 						    regions2D[newRoom.x + x][newRoom.y + y] = currentRegion;
 						}
 					}
@@ -140,7 +139,7 @@ public class Map {
 		Direction lastDir = null;
 
 		currentRegion++;
-		setTile(x, y, Tile.Type.FLOOR);
+		setTile(new Floor(x, y));
 		regions2D[x][y] = currentRegion;
 
 		Point start = new Point(x,y);
@@ -164,10 +163,10 @@ public class Map {
 			        	        dir = unmadeCells.get(randomIndex);
 				}
 			        Point carvePoint = directionOffset(cell, dir, 1);
-				setTile(carvePoint.x, carvePoint.y, Tile.Type.FLOOR);
+				setTile(new Floor(carvePoint.x, carvePoint.y));
 				regions2D[carvePoint.x][carvePoint.y] = currentRegion;
 				carvePoint = directionOffset(cell, dir, 2);
-				setTile(carvePoint.x, carvePoint.y, Tile.Type.FLOOR);
+				setTile(new Floor(carvePoint.x, carvePoint.y));
 				regions2D[carvePoint.x][carvePoint.y] = currentRegion;
 
 				cells.add(carvePoint);
@@ -250,7 +249,7 @@ public class Map {
 
 	//This is the wall we are going to remove.  Turn it into a door and join all the adjacent regions
 	private void ConnectSections(Point p) {
-	    setTile(p.x, p.y, Tile.Type.DOOR);
+	    setTile(new Door(p.x, p.y));
 	    regions2D[p.x][p.y] = currentRegion;
 	    if (regions2D[p.x-1][p.y] != -1 && regions2D[p.x-1][p.y] != currentRegion ) {setRegion(regions2D[p.x-1][p.y]); }
 	    if (regions2D[p.x+1][p.y] != -1 && regions2D[p.x+1][p.y] != currentRegion ) {setRegion(regions2D[p.x+1][p.y]);	}
@@ -266,21 +265,16 @@ public class Map {
 	}
 
 	
-	public Tile getTile(int x, int y) {
+	public Sprite getTile(int x, int y) {
 		return grid[x][y];
 	}
 	
-	public void setTile(int x, int y, Tile.Type t) {
-		grid[x][y] = new Tile(t);
-		if (t == Type.DOOR) {
-			if (grid[x-1][y].isSolid() && grid[x+1][y].isSolid()) {
-				grid[x][y].setImage(1);
-				grid[x][y].setSolid(false);
-			}
-			else {
-				grid[x][y].setImage(3);
-				grid[x][y].setSolid(false);
-			}
+	public void setTile(Sprite s) {
+		int x = s.getLocation().x;
+		int y = s.getLocation().y;
+		grid[x][y] = s;
+		if (s instanceof Door) { //TODO:  Move this functionality to the door class
+			((Door)grid[x][y]).defineSuroundings(grid[x][y-1], grid[x][y+1], grid[x-1][y], grid[x+1][y]);
 		}
 	}
 	
@@ -293,7 +287,7 @@ public class Map {
 			if (getTile(x,y-1).isSolid()) { solidCount++; }
 			if (getTile(x,y+1).isSolid()) { solidCount++; }
 			if (solidCount >= 3) {  //If there were blocks on three or four sides
-				grid[x][y] = new Tile(Type.WALL);
+				grid[x][y] = new Wall(x,y);
 				checkAndFill(x-1,y); //We may have just made a neighbor a dead end
 				checkAndFill(x+1,y); //Now we recursively call checkAndFill for all the neighbor blocks
 				checkAndFill(x,y-1); 
@@ -302,25 +296,10 @@ public class Map {
 		}
 	}
 	
-	public void CloseDoor(int x, int y) {
-		if(grid[x][y].getType() == Type.DOOR && !grid[x][y].isSolid()) {
-			grid[x][y].setImage(grid[x][y].getImage() -1 );
-			grid[x][y].setSolid(true);
-		}
-	}
-	
-	public void OpenDoor(int x, int y) {
-		if(grid[x][y].getType() == Type.DOOR && grid[x][y].isSolid()) {
-			grid[x][y].setImage(grid[x][y].getImage() +1 );
-			grid[x][y].setSolid(false);
-		}
-		
-	}
-	
 	public void CloseAllDoors() {
 		for (int y=1; y< grid[0].length; y++) {
 			for (int x=1; x<grid.length; x++) {
-				CloseDoor(x,y);
+				if (grid[x][y] instanceof Door) { ((Door)grid[x][y]).CloseDoor(); }
 			}
 		}
 	}
@@ -332,6 +311,7 @@ public class Map {
 			}
 		}
 	}
+	
 	
 	public void SetVisible(Point center, int radius) {
 		Rectangle maxRect = new Rectangle(center.x - radius, center.y - radius, 2*radius, 2*radius);
@@ -353,12 +333,12 @@ public class Map {
 	private void UpdateWallImages() {
 		for(int y=0; y<grid[0].length; y++) {
 			for(int x=0; x< grid.length; x++) {
-				if(grid[x][y].getType() == Type.WALL) {
-					boolean bTop = y>0 && grid[x][y-1].getType()==Type.WALL;
-					boolean bBottom = y<grid[0].length-1 && grid[x][y+1].getType() == Type.WALL;
-					boolean bLeft = x>0 && grid[x-1][y].getType() == Type.WALL;
-					boolean bRight = x<grid.length-1 && grid[x+1][y].getType() == Type.WALL;
-					grid[x][y].UpdateWallImage(bTop, bBottom, bLeft, bRight);
+				if(grid[x][y] instanceof Wall) {
+					boolean bTop = y>0 && grid[x][y-1] instanceof Wall;
+					boolean bBottom = y<grid[0].length-1 && grid[x][y+1] instanceof Wall;
+					boolean bLeft = x>0 && grid[x-1][y] instanceof Wall;
+					boolean bRight = x<grid.length-1 && grid[x+1][y] instanceof Wall;
+					((Wall)grid[x][y]).UpdateWallImage(bTop, bBottom, bLeft, bRight);
 				}
 			}
 		}	

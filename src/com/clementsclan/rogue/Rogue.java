@@ -29,6 +29,7 @@ public class Rogue {
 			}
 		}
 				
+		System.out.println("End: Rogue");
 
 
 	}

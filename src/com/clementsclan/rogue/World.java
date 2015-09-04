@@ -1,7 +1,5 @@
 package com.clementsclan.rogue;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 
 import org.eclipse.swt.SWT;
@@ -30,7 +28,6 @@ public class World {
 	private Canvas statsCanvas;
 	private Canvas radarCanvas;
 	
-	private List<Health> healthList;
 	private int score;
 
 	private static final int MAP_WIDTH = 51;
@@ -95,14 +92,15 @@ public class World {
 		player = new Player(room.x+1,room.y+1);
     	map.SetVisible(player.getLocation(), player.getVisibilityRadius());
 			
-		healthList = new ArrayList<Health>();
 		Random random = new Random();
 			
 		int numberRooms = map.getNumberRooms();
 		for(int i=0; i<numberRooms; i++) {
 			if(random.nextInt(100) >= 50) { // 50% chance the room has health in it
 				Rectangle r = map.getRoom(i);
-				map.getTile(r.x+random.nextInt(r.width), r.y+random.nextInt(r.height)).addItem(new Health(random.nextInt(10)+10));
+				int x = r.x+random.nextInt(r.width);
+				int y = r.y+random.nextInt(r.height);
+				map.getTile(x,y).addItem(new Health(x,y,random.nextInt(10)+10));
 			}
 		}
 	}
@@ -111,14 +109,18 @@ public class World {
 	    boolean bRVal = false; //Assume that the move will fail
 	    int testX = player.getLocation().x + deltaX;
 	    int testY = player.getLocation().y + deltaY;
-	    Tile tile = map.getTile(testX, testY);
+	    Sprite tile = map.getTile(testX, testY);
 	    if (!tile.isSolid()) {
 	    	player.setLocation(testX, testY);
 	    	if (player.getHitPoints() > 0) {
-		    	Health h = getHealth(player.getLocation());
-		    	if (h != null){
-		    		player.addHP(h.getBonus());
-		    		healthList.remove(h);
+	    		Sprite[] Items = map.getTile(testX, testY).GetItems();
+	    		if (Items != null) { 
+	    			for(Sprite s : Items) {
+	    				if (s instanceof Health) {
+	    					player.addHP(((Health)s).getBonus());
+	    					map.getTile(testX,  testY).removeItem(s);
+	    				}
+	    			}
 		    	}
 		    	player.addHP(-1); //moving always costs you a health point
 		    	score += 1;
@@ -126,8 +128,8 @@ public class World {
 	    	map.SetVisible(player.getLocation(), player.getVisibilityRadius());
 	    	bRVal = true; //The move worked
 	    }
-	    else if (tile.getType() == Tile.Type.DOOR) {
-	    	map.OpenDoor(testX, testY);
+	    else if (tile instanceof Door) {
+	    	((Door)tile).OpenDoor();
 	    	bRVal = true;  //The move failed, We still want to repaint because the door changed
 	    }
 	    return bRVal;
@@ -168,12 +170,6 @@ public class World {
 		
 		int tileWidth = mapRect.width / visibleRect.width;
 		int tileHeight = mapRect.height / visibleRect.height;
-	    for(Health h : healthList) {
-	    	Point l = h.getLocation();
-	    	if (visibleRect.contains(l)) {
-	    		h.draw(mapGC, mapRect.x+(l.x-visibleRect.x)*tileWidth, mapRect.y+(l.y-visibleRect.y)*tileHeight, tileWidth,tileHeight);
-	    	}
-	    }
 	    //Draw Player
 	    Point playerLocation = player.getLocation();
 	    if (visibleRect.contains(playerLocation)) {
@@ -197,20 +193,6 @@ public class World {
 		}
 	};
 
-	//Check to see if there is a health potion at this location
-	private Health getHealth(Point mapLocation) {
-		Health hRVal = null;
-	    	for(Health h : healthList) {
-	    		Point healthLocation = h.getLocation();
-	    		if (healthLocation.x == mapLocation.x && healthLocation.y == mapLocation.y) {
-	    			hRVal = h;
-	    			break;
-	    		}
-	    	}
-	    	return hRVal;
-	}
-
-	
 	private KeyListener keyListener = new KeyListener() {
 
 		@Override

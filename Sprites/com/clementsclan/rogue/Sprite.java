@@ -1,6 +1,7 @@
 package com.clementsclan.rogue;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import org.eclipse.swt.graphics.GC;
@@ -21,12 +22,20 @@ public class Sprite {
 	private boolean hidden;
 	private List<Sprite> itemList;
 	
+	private static HashMap<String,Image> imageMap = new HashMap<String,Image>();
 	
-	public Sprite(boolean isSolid, int x, int y) {
+	public Sprite(boolean isSolid, int x, int y, String imagePath, int nFrames) {
 		itemList = null;
 		location = new Point(x,y);
 		solid = isSolid;
 		hidden = false;
+		if (!imageMap.containsKey(imagePath)){
+			Display display = Display.getCurrent();
+			imageMap.put(imagePath, getTransparentVersion(display, new Image(display, imagePath)));
+		}
+		imageStrip = imageMap.get(imagePath);
+		numberFrames = nFrames;
+		setImage(0);
 	}
 	
 	public int getNumberFrames() {
@@ -41,12 +50,6 @@ public class Sprite {
 	//Get and set being solid
 	public boolean isSolid()		  	{ return solid;				}
 	public void setSolid(boolean bSolid) 	{ solid = bSolid;			}
-	//Sets the image to use for this sprite, and tells us how many frames are in the image
-	public void setImage(Image image, int nFrames) {
-		imageStrip = image;
-		numberFrames = nFrames;
-		setImage(0);
-	}
 		
 	//Adjust our source rectangle to frame the selection we want to use based on the frameIndex
 	public void setImage(int frameIndex) {
@@ -96,7 +99,10 @@ public class Sprite {
 	
 	public Sprite[] GetItems() {
 		Sprite[] rList = null;
-		if (itemList != null) {rList = (Sprite[])itemList.toArray();}
+		if (itemList != null) {
+			rList = new Sprite[itemList.size()];
+			rList = itemList.toArray(rList);
+		}
 		return rList;
 	}
 	
